@@ -18,28 +18,30 @@ const toolbarOptions = [
   ["clean"],
 ]
 
-// Detect if content is complex HTML from n8n (has style tags or blog-wrap class)
 function isComplexHtml(val: string): boolean {
   return val.includes("<style>") || val.includes("blog-wrap") || val.includes("<!DOCTYPE")
 }
+
+type EditorMode = "visual" | "html" | "preview"
 
 const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const quillRef = useRef<any>(null)
   const isInitialized = useRef(false)
+  const isComplex = isComplexHtml(value || "")
 
-  // Auto-detect complex HTML and force HTML mode
-  const [showHtml, setShowHtml] = useState(
-    forceHtml || isComplexHtml(value || "")
+  const [mode, setMode] = useState<EditorMode>(
+    forceHtml || isComplex ? "html" : "visual"
   )
   const [htmlValue, setHtmlValue] = useState(value || "")
   const [imagePickerOpen, setImagePickerOpen] = useState(false)
+  const [imagePlaceholderIndex, setImagePlaceholderIndex] = useState<number | null>(null)
   const quillRangeRef = useRef<any>(null)
 
-  // If value arrives after mount and is complex HTML — switch to HTML mode
+  // Auto switch to HTML mode if complex HTML arrives
   useEffect(() => {
-    if (value && isComplexHtml(value) && !showHtml) {
-      setShowHtml(true)
+    if (value && isComplexHtml(value) && mode === "visual") {
+      setMode("html")
       setHtmlValue(value)
     }
   }, [value])
@@ -61,25 +63,10 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
         const style = document.createElement("style")
         style.id = "quill-custom-css"
         style.textContent = `
-          .ql-toolbar {
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-            background: #f9fafb;
-            border-color: #e5e7eb !important;
-          }
-          .ql-container {
-            border-color: #e5e7eb !important;
-            font-size: 15px;
-            font-family: inherit;
-          }
-          .ql-editor {
-            min-height: 320px;
-            line-height: 1.8;
-          }
-          .ql-editor.ql-blank::before {
-            color: #9ca3af;
-            font-style: normal;
-          }
+          .ql-toolbar { border-top-left-radius: 8px; border-top-right-radius: 8px; background: #f9fafb; border-color: #e5e7eb !important; }
+          .ql-container { border-color: #e5e7eb !important; font-size: 15px; font-family: inherit; }
+          .ql-editor { min-height: 320px; line-height: 1.8; }
+          .ql-editor.ql-blank::before { color: #9ca3af; font-style: normal; }
           .ql-editor h2 { font-size: 22px; font-weight: 700; margin: 16px 0 8px; color: #0e2547; }
           .ql-editor h3 { font-size: 18px; font-weight: 600; margin: 12px 0 6px; color: #0e2547; }
           .ql-editor h4 { font-size: 16px; font-weight: 600; margin: 10px 0 4px; color: #0e2547; }
@@ -88,82 +75,35 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
           .ql-editor blockquote { border-left: 4px solid #e61e73; padding-left: 16px; color: #6b7280; margin: 12px 0; }
           .ql-editor ul, .ql-editor ol { padding-left: 24px; margin: 8px 0; }
           .ql-editor a { color: #e61e73; }
-          .ql-image-url-prompt {
-            position: fixed; inset: 0;
-            background: rgba(0,0,0,0.5);
-            display: flex; align-items: center; justify-content: center;
-            z-index: 9999;
-          }
-          .ql-image-url-box {
-            background: white; border-radius: 12px; padding: 24px;
-            width: 500px; max-width: 90vw;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-          }
-          .ql-image-url-box h3 { font-size: 16px; font-weight: 700; color: #0e2547; margin: 0 0 16px; }
-          .ql-image-url-box input[type="text"] {
-            width: 100%; border: 1px solid #e5e7eb; border-radius: 8px;
-            padding: 10px 14px; font-size: 14px; outline: none; box-sizing: border-box;
-          }
-          .ql-image-url-box input[type="text"]:focus { border-color: #99dcf8; }
-          .ql-image-url-box p { font-size: 12px; color: #9ca3af; margin: 6px 0 16px; }
-          .ql-image-url-actions { display: flex; gap: 8px; justify-content: flex-end; }
-          .ql-image-url-cancel {
-            padding: 8px 16px; border: 1px solid #e5e7eb; border-radius: 8px;
-            background: white; font-size: 13px; font-weight: 600; cursor: pointer; color: #6b7280;
-          }
-          .ql-image-url-cancel:hover { background: #f9fafb; }
-          .ql-image-url-insert {
-            padding: 8px 16px; border: none; border-radius: 8px;
-            background: #e61e73; color: white; font-size: 13px; font-weight: 600; cursor: pointer;
-          }
-          .ql-image-url-insert:hover { background: #ca155f; }
-          .ql-image-tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 2px solid #f3f4f6; }
-          .ql-tab-btn {
-            padding: 8px 16px; border: none; background: none; font-size: 13px;
-            font-weight: 600; color: #9ca3af; cursor: pointer;
-            border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s;
-          }
-          .ql-tab-btn.active { color: #0e2547; border-bottom-color: #e61e73; }
-          .ql-tab-panel { display: block; }
-          .ql-tab-panel.hidden { display: none; }
-          .ql-upload-area {
-            border: 2px dashed #e5e7eb; border-radius: 10px; padding: 32px 16px;
-            text-align: center; cursor: pointer; transition: all 0.2s; background: #f9fafb;
-          }
-          .ql-upload-area:hover { border-color: #99dcf8; background: #f0f9ff; }
-          .ql-upload-area span { font-size: 32px; display: block; margin-bottom: 8px; }
-          .ql-upload-area p { font-size: 14px; font-weight: 600; color: #374151; margin: 4px 0; }
-          .ql-upload-area small { font-size: 12px; color: #9ca3af; }
-          .ql-upload-area.hidden { display: none; }
-          #ql-upload-preview { text-align: center; margin-top: 8px; }
-          #ql-upload-preview.hidden { display: none; }
-          #ql-upload-preview img {
-            max-height: 160px; max-width: 100%; border-radius: 8px;
-            object-fit: cover; margin: 0 auto; display: block;
-          }
-          .ql-preview-name { font-size: 12px; color: #6b7280; margin-top: 6px; }
-          .ql-upload-insert {
-            padding: 8px 16px; border: none; border-radius: 8px;
-            background: #e61e73; color: white; font-size: 13px; font-weight: 600; cursor: pointer;
-          }
-          .ql-upload-insert:disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
-          .ql-upload-insert:not(:disabled):hover { background: #ca155f; }
           .ql-html-editor {
-            width: 100%;
-            min-height: 400px;
-            padding: 16px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.6;
-            border: 1px solid #e5e7eb;
-            border-top: none;
-            outline: none;
-            resize: vertical;
-            color: #374151;
-            background: #fafafa;
-            box-sizing: border-box;
+            width: 100%; min-height: 400px; padding: 16px;
+            font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6;
+            border: 1px solid #e5e7eb; border-top: none; outline: none;
+            resize: vertical; color: #374151; background: #fafafa; box-sizing: border-box;
           }
           .ql-html-editor:focus { background: #fff; }
+          .img-placeholder-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 20px;
+            margin: 16px 0;
+            border: 2px dashed #e61e73;
+            border-radius: 12px;
+            background: #fff5f8;
+            color: #e61e73;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+          }
+          .img-placeholder-btn:hover {
+            background: #fce7f3;
+            border-color: #be185d;
+            transform: scale(1.01);
+          }
         `
         document.head.appendChild(style)
       }
@@ -179,6 +119,7 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
             handlers: {
               image: () => {
                 quillRangeRef.current = quill.getSelection()
+                setImagePlaceholderIndex(null)
                 setImagePickerOpen(true)
               },
             },
@@ -186,7 +127,6 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
         },
       })
 
-      // Only set content in Quill if it's simple HTML (not complex n8n HTML)
       if (value && !isComplexHtml(value)) {
         quill.root.innerHTML = value
         setHtmlValue(value)
@@ -205,41 +145,64 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
     loadQuill()
   }, [])
 
-  // Sync if value changes after mount — only for simple HTML
   useEffect(() => {
     if (!quillRef.current || !value) return
-    if (isComplexHtml(value)) return // skip Quill for complex HTML
+    if (isComplexHtml(value)) return
     if (quillRef.current.root.innerHTML !== value) {
       quillRef.current.root.innerHTML = value
       setHtmlValue(value)
     }
   }, [value])
 
-  function handleToggleHtml() {
-    if (showHtml) {
-      // Only go back to visual if content is simple HTML
-      if (isComplexHtml(htmlValue)) {
-        alert("This content has complex HTML from n8n automation. Edit in HTML mode only to preserve formatting.")
-        return
-      }
-      if (quillRef.current) {
-        quillRef.current.root.innerHTML = htmlValue
-        onChange(htmlValue)
-      }
-      setShowHtml(false)
-    } else {
-      const current = quillRef.current?.root.innerHTML || ""
-      setHtmlValue(current === "<p><br></p>" ? "" : current)
-      setShowHtml(true)
-    }
-  }
+  // Replace image placeholder with actual image URL
+  function replacePlaceholderWithImage(url: string, index: number | null) {
+    let updated = htmlValue
 
-  function handleHtmlChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setHtmlValue(e.target.value)
-    onChange(e.target.value)
+    if (index !== null) {
+      const imgTag = `<img src="${url}" alt="blog image ${index}" style="max-width:100%;border-radius:10px;margin:16px 0;display:block;" />`
+
+      // Try to replace featured image placeholder
+      const featuredPattern = /<p><em>\[Featured Image[^\]]*\]<\/em><\/p>/gi
+      // Try to replace section image placeholder by index
+      const sectionPattern = new RegExp(
+        `<p><em>\\[Section ${index} Image[^\\]]*\\]<\\/em><\\/p>`,
+        "gi"
+      )
+
+      if (index === 0 && featuredPattern.test(updated)) {
+        updated = updated.replace(featuredPattern, imgTag)
+      } else if (sectionPattern.test(updated)) {
+        updated = updated.replace(sectionPattern, imgTag)
+      } else {
+        // Fallback — replace nth placeholder regardless of type
+        let count = 0
+        updated = updated.replace(
+          /<p><em>\[[^\]]*Image[^\]]*\]<\/em><\/p>/gi,
+          (m) => {
+            if (count === index) {
+              count++
+              return imgTag
+            }
+            count++
+            return m
+          }
+        )
+      }
+    } else {
+      // Append at end when using toolbar image button
+      updated = updated + `\n<img src="${url}" alt="blog image" style="max-width:100%;border-radius:10px;margin:16px 0;display:block;" />`
+    }
+
+    setHtmlValue(updated)
+    onChange(updated)
   }
 
   function handleImageFromPicker(url: string) {
+    if (mode === "preview" || mode === "html") {
+      replacePlaceholderWithImage(url, imagePlaceholderIndex)
+      setImagePickerOpen(false)
+      return
+    }
     if (!quillRef.current) return
     const index = quillRangeRef.current
       ? quillRangeRef.current.index
@@ -249,47 +212,156 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
     setImagePickerOpen(false)
   }
 
+  // Build preview HTML — replace placeholders with clickable pink buttons
+  function buildPreviewHtml(html: string): string {
+    let i = 0
+    return html.replace(
+      /<p><em>(\[(?:Featured Image|Section \d+ Image)[^\]]*\])<\/em><\/p>/gi,
+      (_match, label) => {
+        const idx = i++
+        return `<button
+          class="img-placeholder-btn"
+          onclick="window.__insertImageAt(${idx})"
+          type="button"
+        >
+          🖼 Click to insert image — ${label}
+        </button>`
+      }
+    )
+  }
+
+  function switchMode(newMode: EditorMode) {
+    if (newMode === "visual" && quillRef.current) {
+      quillRef.current.root.innerHTML = htmlValue
+      onChange(htmlValue)
+    }
+    if (newMode === "html" && mode === "visual" && quillRef.current) {
+      const current = quillRef.current.root.innerHTML
+      setHtmlValue(current === "<p><br></p>" ? "" : current)
+    }
+    setMode(newMode)
+  }
+
+  function handleHtmlChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setHtmlValue(e.target.value)
+    onChange(e.target.value)
+  }
+
+  // Register global click handler for preview placeholder buttons
+  useEffect(() => {
+    (window as any).__insertImageAt = (index: number) => {
+      setImagePlaceholderIndex(index)
+      setImagePickerOpen(true)
+    }
+    return () => {
+      delete (window as any).__insertImageAt
+    }
+  }, [])
+
   return (
     <div className="flex flex-col overflow-hidden rounded-lg border border-ui-border-base">
 
-      {/* Toggle bar */}
+      {/* Mode toggle bar */}
       <div className="flex items-center justify-between border-b border-ui-border-base bg-ui-bg-base px-3 py-2">
         <div className="flex items-center gap-2">
-          <p className="text-[11px] font-semibold text-ui-fg-subtle uppercase tracking-wider">
-            {showHtml ? "HTML Source" : "Visual Editor"}
-          </p>
-          {/* Badge for n8n generated content */}
           {isComplexHtml(htmlValue) && (
-            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
-              style={{ background: "#e61e73" }}>
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+              style={{ background: "#e61e73" }}
+            >
               n8n generated
             </span>
           )}
         </div>
+
+        {/* Three mode buttons */}
+        <div className="flex items-center gap-1 rounded-[8px] border border-ui-border-base bg-ui-bg-subtle p-0.5">
+          <button
+            type="button"
+            onClick={() => switchMode("visual")}
+            className="rounded-[6px] px-3 py-1 text-[11px] font-semibold transition-all"
+            style={{
+              background: mode === "visual" ? "#0e2547" : "transparent",
+              color: mode === "visual" ? "white" : "#6b7280",
+            }}
+          >
+            ✏️ Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("preview")}
+            className="rounded-[6px] px-3 py-1 text-[11px] font-semibold transition-all"
+            style={{
+              background: mode === "preview" ? "#0e2547" : "transparent",
+              color: mode === "preview" ? "white" : "#6b7280",
+            }}
+          >
+            👁 Preview
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("html")}
+            className="rounded-[6px] px-3 py-1 text-[11px] font-semibold transition-all"
+            style={{
+              background: mode === "html" ? "#e61e73" : "transparent",
+              color: mode === "html" ? "white" : "#6b7280",
+              fontFamily: mode === "html" ? "monospace" : "inherit",
+            }}
+          >
+            {`</>`} HTML
+          </button>
+        </div>
+
+        {/* Image insert button */}
         <button
           type="button"
-          onClick={handleToggleHtml}
-          className="flex items-center gap-1.5 rounded-[6px] border border-ui-border-base px-2.5 py-1 text-[11px] font-semibold transition-all hover:bg-ui-bg-base-hover"
-          style={{
-            color: showHtml ? "#e61e73" : "#6b7280",
-            borderColor: showHtml ? "#e61e73" : "",
+          onClick={() => {
+            setImagePlaceholderIndex(null)
+            quillRangeRef.current = quillRef.current?.getSelection() || null
+            setImagePickerOpen(true)
           }}
+          className="rounded-[6px] border border-ui-border-base px-2.5 py-1 text-[11px] font-semibold transition-all hover:bg-ui-bg-base-hover"
+          style={{ color: "#6b7280" }}
+          title="Insert image from Supabase library"
         >
-          {showHtml ? (
-            <><span>👁</span> Visual</>
-          ) : (
-            <><span style={{ fontFamily: "monospace" }}>{`</>`}</span> HTML</>
-          )}
+          🖼 Image
         </button>
       </div>
 
-      {/* Quill visual editor — hidden when HTML mode or complex content */}
-      <div style={{ display: showHtml ? "none" : "block" }}>
+      {/* VISUAL EDITOR — Quill */}
+      <div style={{ display: mode === "visual" ? "block" : "none" }}>
         <div ref={containerRef} />
       </div>
 
-      {/* HTML source textarea */}
-      {showHtml && (
+      {/* PREVIEW MODE */}
+      {mode === "preview" && (
+        <div
+          className="overflow-y-auto"
+          style={{ minHeight: "400px", maxHeight: "700px", background: "#fff" }}
+        >
+          <div
+            className="flex items-center gap-2 px-4 py-2 text-[12px] font-medium"
+            style={{
+              background: "#f0f9ff",
+              color: "#0369a1",
+              borderBottom: "1px solid #bae6fd",
+            }}
+          >
+            <span>👆</span>
+            <span>
+              Click any pink button to insert image from Supabase · or use{" "}
+              <strong>🖼 Image</strong> button above to insert anywhere
+            </span>
+          </div>
+          <div
+            className="p-6"
+            dangerouslySetInnerHTML={{ __html: buildPreviewHtml(htmlValue) }}
+          />
+        </div>
+      )}
+
+      {/* HTML SOURCE */}
+      {mode === "html" && (
         <textarea
           className="ql-html-editor"
           value={htmlValue}
@@ -302,7 +374,11 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
       {/* Image Picker Modal */}
       {imagePickerOpen && (
         <ImagePicker
-          activeField="Inline Image (inside article)"
+          activeField={
+            imagePlaceholderIndex !== null
+              ? `Section ${imagePlaceholderIndex} Image`
+              : "Inline Image"
+          }
           onSelect={handleImageFromPicker}
           onClose={() => setImagePickerOpen(false)}
         />
