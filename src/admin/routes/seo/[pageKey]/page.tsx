@@ -63,13 +63,18 @@ const PAGE_CONFIG: Record<string, {
 }
 
 const PageSeoEditor = () => {
-  const { pageKey } = useParams<{ pageKey: string }>()
+  const { pageKey: rawPageKey } = useParams<{ pageKey: string }>()
+  const pageKey = rawPageKey ? decodeURIComponent(rawPageKey) : ""
   const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [settingId, setSettingId] = useState<string | null>(null)
 
-  const config = PAGE_CONFIG[pageKey || ""] || {
+  const serviceSlug = pageKey.startsWith("service:")
+    ? pageKey.replace("service:", "")
+    : ""
+
+  let config = PAGE_CONFIG[pageKey || ""] || {
     label: pageKey,
     icon: "📄",
     schemaType: "WebPage",
@@ -77,6 +82,18 @@ const PageSeoEditor = () => {
     showFaqs: false,
     showInternalLinks: false,
     description: "",
+  }
+
+  if (serviceSlug) {
+    config = {
+      label: `Service: ${serviceSlug}`,
+      icon: "⚡",
+      schemaType: "WebPage + Service",
+      showHero: false,
+      showFaqs: true,
+      showInternalLinks: true,
+      description: `SEO settings for /services/${serviceSlug}`,
+    }
   }
 
   const [form, setForm] = useState({
