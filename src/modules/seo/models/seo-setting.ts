@@ -3,9 +3,9 @@ import { model } from "@medusajs/framework/utils"
 const SeoSetting = model.define("seo_setting", {
   id: model.id().primaryKey(),
 
-  // Page identifier
-  page_key: model.text(),        // "homepage", "about", "contact", "services", "blog"
-  page_label: model.text(),      // "Home Page", "About Us" etc — for display
+  // Page identifier — unique per page
+  page_key: model.text().unique(),
+  page_label: model.text(),
 
   // ── Core SEO ──────────────────────────────────
   meta_title: model.text().nullable(),
@@ -15,7 +15,7 @@ const SeoSetting = model.define("seo_setting", {
   robots_index: model.boolean().default(true),
   robots_follow: model.boolean().default(true),
   primary_keyword: model.text().nullable(),
-  secondary_keywords: model.json(),   // string[]
+  secondary_keywords: model.json().nullable(),  // string[]
   meta_keywords: model.text().nullable(),
 
   // ── Open Graph ────────────────────────────────
@@ -23,7 +23,7 @@ const SeoSetting = model.define("seo_setting", {
   og_description: model.text().nullable(),
   og_image: model.text().nullable(),
   og_url: model.text().nullable(),
-  og_type: model.text().nullable(),   // website | article | service
+  og_type: model.text().nullable(),
 
   // ── Twitter ───────────────────────────────────
   twitter_card: model.text().nullable(),
@@ -32,8 +32,8 @@ const SeoSetting = model.define("seo_setting", {
   twitter_image: model.text().nullable(),
 
   // ── Schema ────────────────────────────────────
-  schema_type: model.text().nullable(),  // WebPage | Article | Service
-  schema_json: model.text().nullable(),  // auto-generated JSON-LD string
+  schema_type: model.text().nullable(),
+  schema_json: model.text().nullable(),
 
   // ── Page Specific ─────────────────────────────
   hero_title: model.text().nullable(),
@@ -41,8 +41,8 @@ const SeoSetting = model.define("seo_setting", {
   page_title: model.text().nullable(),
   page_description: model.text().nullable(),
   content_body: model.text().nullable(),
-  faq_section: model.json(),       // [{question, answer}]
-  internal_links: model.json(),    // [{page, anchor}]
+  faq_section: model.json().nullable(),      // {question, answer}[]
+  internal_links: model.json().nullable(),   // {page, anchor}[]
 
   // ── Technical SEO ─────────────────────────────
   sitemap_inclusion: model.boolean().default(true),

@@ -25,7 +25,7 @@ const SiteSetting = model.define("site_setting", {
   social_youtube: model.text().nullable(),
 
   // ── Schema ────────────────────────────────────
-  organization_schema: model.text().nullable(),  // auto-generated JSON-LD
+  organization_schema: model.text().nullable(),
 })
 
 export default SiteSetting

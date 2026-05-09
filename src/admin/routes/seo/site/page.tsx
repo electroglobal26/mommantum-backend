@@ -1,4 +1,4 @@
-import { Button, Container, Heading, Input, Label } from "@medusajs/ui"
+import { Button, Container, Heading, Input, Label, Textarea } from "@medusajs/ui"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
@@ -23,6 +23,7 @@ const SiteSettingsPage = () => {
     social_twitter: "",
     social_facebook: "",
     social_youtube: "",
+    organization_schema: "",
   })
 
   useEffect(() => {
@@ -102,6 +103,20 @@ const SiteSettingsPage = () => {
           <div><Label>Twitter / X</Label><Input value={form.social_twitter} onChange={e => updateForm("social_twitter", e.target.value)} placeholder="https://twitter.com/mommantum" /></div>
           <div><Label>Facebook</Label><Input value={form.social_facebook} onChange={e => updateForm("social_facebook", e.target.value)} placeholder="https://facebook.com/mommantum" /></div>
           <div><Label>YouTube</Label><Input value={form.social_youtube} onChange={e => updateForm("social_youtube", e.target.value)} placeholder="https://youtube.com/@mommantum" /></div>
+        </div>
+      </Container>
+
+      {/* Schema */}
+      <Container className="p-6 flex flex-col gap-4">
+        <Heading level="h2">Organization Schema</Heading>
+        <div>
+          <Label>Organization JSON-LD</Label>
+          <Textarea
+            value={form.organization_schema}
+            onChange={e => updateForm("organization_schema", e.target.value)}
+            placeholder='{"@context":"https://schema.org","@type":"Organization"}'
+            rows={6}
+          />
         </div>
       </Container>
 

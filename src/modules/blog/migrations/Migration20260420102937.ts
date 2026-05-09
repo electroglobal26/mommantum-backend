@@ -10,7 +10,18 @@ export class Migration20260420102937 extends Migration {
     this.addSql(`alter table if exists "post" alter column "excerpt" drop not null;`);
     this.addSql(`alter table if exists "post" alter column "content" type text using ("content"::text);`);
     this.addSql(`alter table if exists "post" alter column "content" drop not null;`);
-    this.addSql(`alter table if exists "post" rename column "images" to "image_urls";`);
+    this.addSql(`do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'post' and column_name = 'images'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_name = 'post' and column_name = 'image_urls'
+  ) then
+    alter table "post" rename column "images" to "image_urls";
+  end if;
+end $$;`);
   }
 
   override async down(): Promise<void> {

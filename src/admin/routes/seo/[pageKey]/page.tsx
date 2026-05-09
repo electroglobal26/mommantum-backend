@@ -100,6 +100,7 @@ const PageSeoEditor = () => {
     twitter_image: "",
     hero_title: "",
     hero_subtitle: "",
+    schema_json: "",
     sitemap_inclusion: true,
     hreflang: "",
     redirect_url: "",
@@ -137,6 +138,7 @@ const PageSeoEditor = () => {
             twitter_image: existing.twitter_image || "",
             hero_title: existing.hero_title || "",
             hero_subtitle: existing.hero_subtitle || "",
+            schema_json: existing.schema_json || "",
             sitemap_inclusion: existing.sitemap_inclusion ?? true,
             hreflang: existing.hreflang || "",
             redirect_url: existing.redirect_url || "",
@@ -440,6 +442,15 @@ const PageSeoEditor = () => {
       {/* Technical SEO */}
       <Container className="p-6 flex flex-col gap-4">
         <Heading level="h2">⚙️ Technical SEO</Heading>
+        <div>
+          <Label>Schema JSON-LD</Label>
+          <Textarea
+            value={form.schema_json}
+            onChange={e => updateForm("schema_json", e.target.value)}
+            placeholder='{"@context":"https://schema.org","@type":"WebPage"}'
+            rows={6}
+          />
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label>Hreflang (if multi-language)</Label>
