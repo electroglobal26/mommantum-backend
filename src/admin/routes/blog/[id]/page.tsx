@@ -262,22 +262,34 @@ const EditBlogPostPage = () => {
               placeholder="Paste URL or click thumbnail →"
               className="flex-1"
             />
-            <button
-              type="button"
-              onClick={() => openPicker("featured")}
-              className="flex h-[38px] w-[38px] shrink-0 items-center justify-center overflow-hidden rounded-[8px] border-2 transition-all hover:border-[#e61e73]"
-              style={{
-                borderColor: form.featured_image ? "#e61e73" : "#e5e7eb",
-                background: "#f9fafb",
-              }}
-              title="Pick from Supabase library"
-            >
-              {form.featured_image ? (
-                <img src={form.featured_image} alt="cover" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-[16px]">🖼</span>
+            <div className="relative group/feat">
+              <button
+                type="button"
+                onClick={() => openPicker("featured")}
+                className="flex h-[38px] w-[38px] shrink-0 items-center justify-center overflow-hidden rounded-[8px] border-2 transition-all hover:border-[#e61e73]"
+                style={{
+                  borderColor: form.featured_image ? "#e61e73" : "#e5e7eb",
+                  background: "#f9fafb",
+                }}
+                title="Pick from Supabase library"
+              >
+                {form.featured_image ? (
+                  <img src={form.featured_image} alt="cover" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-[16px]">🖼</span>
+                )}
+              </button>
+              {form.featured_image && (
+                <button
+                  type="button"
+                  onClick={() => updateForm("featured_image", "")}
+                  className="absolute -right-2 -top-2 hidden h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white shadow-md hover:bg-red-600 group-hover/feat:flex"
+                  title="Remove Image"
+                >
+                  ✕
+                </button>
               )}
-            </button>
+            </div>
           </div>
         </div>
 
@@ -296,6 +308,7 @@ const EditBlogPostPage = () => {
                 placeholder="Paste URL or click thumbnail →"
                 className="flex-1"
               />
+            <div className="relative group/extra">
               <button
                 type="button"
                 onClick={() => openPicker(i)}
@@ -312,6 +325,21 @@ const EditBlogPostPage = () => {
                   <span className="text-[16px]">🖼</span>
                 )}
               </button>
+              {image_urls[i] && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = [...image_urls]
+                    updated[i] = ""
+                    setImageUrls(updated)
+                  }}
+                  className="absolute -right-2 -top-2 hidden h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white shadow-md hover:bg-red-600 group-hover/extra:flex"
+                  title="Remove Image"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
             </div>
           </div>
         ))}

@@ -95,3 +95,25 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     res.status(500).json({ message: err.message })
   }
 }
+export async function DELETE(req: MedusaRequest, res: MedusaResponse) {
+  try {
+    const { name } = req.query as { name?: string }
+
+    if (!name) {
+      return res.status(400).json({ message: "Image name is required" })
+    }
+
+    const supabase = getSupabaseClient()
+    const { error } = await supabase.storage
+      .from(BLOG_IMAGES_BUCKET)
+      .remove([name])
+
+    if (error) {
+      return res.status(500).json({ message: error.message })
+    }
+
+    res.json({ message: "Image deleted successfully" })
+  } catch (err: any) {
+    res.status(500).json({ message: err.message })
+  }
+}

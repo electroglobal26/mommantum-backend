@@ -55,37 +55,63 @@ export default function ImagePicker({ onSelect, onClose, activeField }: Props) {
     })
   }
 
-  async function handleUpload(file: File | null) {
-    if (!file) return
+  async function handleUpload(files: FileList | null) {
+    if (!files || files.length === 0) return
 
     setUploading(true)
     setError("")
 
     try {
-      const data = await fileToBase64(file)
-      const res = await fetch("/admin/blog/images", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: file.name,
-          type: file.type,
-          data,
-        }),
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const data = await fileToBase64(file)
+        const res = await fetch("/admin/blog/images", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: file.name,
+            type: file.type,
+            data,
+          }),
+        })
+        if (!res.ok) {
+          const errData = await res.json()
+          throw new Error(errData.message || `Upload failed for ${file.name}`)
+        }
+        return res.json()
       })
-      const uploaded = await res.json()
 
-      if (!res.ok) {
-        setError(uploaded.message || "Upload failed")
-        return
+      const results = await Promise.all(uploadPromises)
+      setImages((prev) => [...results, ...prev])
+      if (results.length === 1) {
+        setSelected(results[0].url)
       }
-
-      setImages((prev) => [uploaded, ...prev])
-      setSelected(uploaded.url)
     } catch (err: any) {
       setError(err.message || "Upload failed")
     } finally {
       setUploading(false)
+    }
+  }
+
+  async function handleDelete(img: ImageItem, e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!window.confirm(`Are you sure you want to permanently delete "${img.name}"? This cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const res = await fetch(`/admin/blog/images?name=${img.name}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.message || "Delete failed")
+      }
+      setImages(prev => prev.filter(i => i.name !== img.name))
+      if (selected === img.url) setSelected(null)
+    } catch (err: any) {
+      alert(err.message)
     }
   }
 
@@ -156,11 +182,12 @@ export default function ImagePicker({ onSelect, onClose, activeField }: Props) {
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 disabled={uploading}
-                onChange={(e) => handleUpload(e.target.files?.[0] || null)}
+                onChange={(e) => handleUpload(e.target.files)}
                 className="hidden"
               />
-              {uploading ? "Uploading..." : "Upload Image"}
+              {uploading ? "Uploading..." : "Upload Image(s)"}
             </label>
           </div>
         </div>
@@ -194,46 +221,57 @@ export default function ImagePicker({ onSelect, onClose, activeField }: Props) {
               {filtered.map((img) => {
                 const isSelected = selected === img.url
                 return (
-                  <button
-                    key={img.name}
-                    type="button"
-                    onClick={() => setSelected(isSelected ? null : img.url)}
-                    className="group relative overflow-hidden rounded-[10px] transition-all duration-150"
-                    style={{
-                      border: `2px solid ${isSelected ? "#e61e73" : "transparent"}`,
-                      boxShadow: isSelected
-                        ? "0 0 0 3px rgba(230,30,115,0.15), 0 4px 12px rgba(0,0,0,0.1)"
-                        : "0 2px 8px rgba(0,0,0,0.08)",
-                      outline: "none",
-                    }}
-                  >
-                    {/* Image */}
-                    <div className="aspect-square w-full overflow-hidden bg-slate-100">
-                      <img
-                        src={img.url}
-                        alt={img.name}
-                        loading="lazy"
-                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.06]"
-                      />
-                    </div>
-
-                    {/* Checkmark badge */}
-                    {isSelected && (
-                      <div
-                        className="absolute right-1.5 top-1.5 flex h-[20px] w-[20px] items-center justify-center rounded-full text-white text-[10px] font-bold shadow-md"
-                        style={{ background: "#e61e73" }}
-                      >
-                        ✓
+                  <div key={img.name} className="relative group">
+                    <button
+                      type="button"
+                      onClick={() => setSelected(isSelected ? null : img.url)}
+                      className="relative w-full overflow-hidden rounded-[10px] transition-all duration-150"
+                      style={{
+                        border: `2px solid ${isSelected ? "#e61e73" : "transparent"}`,
+                        boxShadow: isSelected
+                          ? "0 0 0 3px rgba(230,30,115,0.15), 0 4px 12px rgba(0,0,0,0.1)"
+                          : "0 2px 8px rgba(0,0,0,0.08)",
+                        outline: "none",
+                      }}
+                    >
+                      {/* Image */}
+                      <div className="aspect-square w-full overflow-hidden bg-slate-100">
+                        <img
+                          src={img.url}
+                          alt={img.name}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.06]"
+                        />
                       </div>
-                    )}
 
-                    {/* Filename on hover */}
-                    <div className="absolute inset-x-0 bottom-0 translate-y-full bg-[#0e2547]/85 px-2 py-1.5 transition-transform duration-150 group-hover:translate-y-0">
-                      <p className="truncate text-[9px] font-medium text-white">
-                        {img.name}
-                      </p>
-                    </div>
-                  </button>
+                      {/* Checkmark badge */}
+                      {isSelected && (
+                        <div
+                          className="absolute right-1.5 top-1.5 flex h-[20px] w-[20px] items-center justify-center rounded-full text-white text-[10px] font-bold shadow-md"
+                          style={{ background: "#e61e73" }}
+                        >
+                          ✓
+                        </div>
+                      )}
+
+                      {/* Filename on hover */}
+                      <div className="absolute inset-x-0 bottom-0 translate-y-full bg-[#0e2547]/85 px-2 py-1.5 transition-transform duration-150 group-hover:translate-y-0">
+                        <p className="truncate text-[9px] font-medium text-white">
+                          {img.name}
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* Delete Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleDelete(img, e)}
+                      className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-red-500 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:bg-red-50"
+                      title="Delete from Library"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 )
               })}
             </div>
