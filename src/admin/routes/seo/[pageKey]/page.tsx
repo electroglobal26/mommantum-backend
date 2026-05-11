@@ -34,13 +34,22 @@ const PAGE_CONFIG: Record<string, {
     description: "About page uses WebPage schema. Add FAQs for rich results.",
   },
   services: {
-    label: "Services",
+    label: "Services Listing",
     icon: "⚙️",
     schemaType: "WebPage + Service",
     showHero: false,
     showFaqs: true,
     showInternalLinks: true,
-    description: "Services page uses WebPage + Service schema.",
+    description: "Services listing page. Uses WebPage + Service schema.",
+  },
+  work: {
+    label: "Work/Portfolio",
+    icon: "📂",
+    schemaType: "CollectionPage",
+    showHero: false,
+    showFaqs: false,
+    showInternalLinks: true,
+    description: "Work listing page showing all case studies.",
   },
   contact: {
     label: "Contact",
@@ -60,6 +69,24 @@ const PAGE_CONFIG: Record<string, {
     showInternalLinks: false,
     description: "Blog listing uses CollectionPage schema.",
   },
+  "privacy-policy": {
+    label: "Privacy Policy",
+    icon: "🔒",
+    schemaType: "WebPage",
+    showHero: false,
+    showFaqs: false,
+    showInternalLinks: false,
+    description: "Standard Privacy Policy page.",
+  },
+  "terms-and-conditions": {
+    label: "Terms & Conditions",
+    icon: "📄",
+    schemaType: "WebPage",
+    showHero: false,
+    showFaqs: false,
+    showInternalLinks: false,
+    description: "Standard Terms & Conditions page.",
+  },
 }
 
 const PageSeoEditor = () => {
@@ -72,6 +99,10 @@ const PageSeoEditor = () => {
 
   const serviceSlug = pageKey.startsWith("service:")
     ? pageKey.replace("service:", "")
+    : ""
+
+  const workSlug = pageKey.startsWith("work:")
+    ? pageKey.replace("work:", "")
     : ""
 
   let config = PAGE_CONFIG[pageKey || ""] || {
@@ -93,6 +124,16 @@ const PageSeoEditor = () => {
       showFaqs: true,
       showInternalLinks: true,
       description: `SEO settings for /services/${serviceSlug}`,
+    }
+  } else if (workSlug) {
+    config = {
+      label: `Case Study: ${workSlug}`,
+      icon: "📂",
+      schemaType: "Article + BlogPosting",
+      showHero: false,
+      showFaqs: true,
+      showInternalLinks: true,
+      description: `SEO settings for /work/${workSlug}`,
     }
   }
 

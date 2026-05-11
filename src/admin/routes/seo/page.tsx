@@ -5,47 +5,40 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 const PAGE_TYPES = [
-  { key: "homepage",  label: "Home Page",      icon: "🏠", schema: "WebSite + Organization" },
-  { key: "about",     label: "About",           icon: "👥", schema: "WebPage" },
-  { key: "services",  label: "Services",        icon: "⚙️", schema: "WebPage + Service" },
-  { key: "contact",   label: "Contact",         icon: "📞", schema: "WebPage + Organization" },
-  { key: "blog",      label: "Blog Listing",    icon: "📝", schema: "CollectionPage" },
+  { key: "homepage",             label: "Home Page",            icon: "🏠", schema: "WebSite + Organization" },
+  { key: "about",                label: "About",                icon: "👥", schema: "WebPage" },
+  { key: "services",             label: "Services Listing",     icon: "⚙️", schema: "WebPage + Service" },
+  { key: "work",                 label: "Work/Portfolio",       icon: "📂", schema: "CollectionPage" },
+  { key: "contact",              label: "Contact",              icon: "📞", schema: "WebPage + Organization" },
+  { key: "blog",                 label: "Blog Listing",         icon: "📝", schema: "CollectionPage" },
+  { key: "privacy-policy",       label: "Privacy Policy",       icon: "🔒", schema: "WebPage" },
+  { key: "terms-and-conditions", label: "Terms & Conditions",   icon: "📄", schema: "WebPage" },
 ]
 
 const SeoListPage = () => {
   const navigate = useNavigate()
   const [settings, setSettings] = useState<any[]>([])
+  const [metadata, setMetadata] = useState<{services: any[], work: any[]}>({ services: [], work: [] })
   const [loading, setLoading] = useState(true)
-  const [serviceSlug, setServiceSlug] = useState("")
 
   useEffect(() => {
-    fetch("/admin/seo", { credentials: "include" })
-      .then(r => r.json())
-      .then(({ settings }) => {
-        setSettings(settings || [])
-        setLoading(false)
-      })
+    Promise.all([
+      fetch("/admin/seo", { credentials: "include" }).then(r => r.json()),
+      fetch("/admin/custom/meta-listing", { credentials: "include" }).then(r => r.json()).catch(() => ({ services: [], work: [] }))
+    ]).then(([seoData, metaData]) => {
+      setSettings(seoData.settings || [])
+      setMetadata(metaData)
+      setLoading(false)
+    })
   }, [])
 
   function getSettingForPage(key: string) {
     return settings.find(s => s.page_key === key)
   }
 
-  function openServiceSeo(slug: string) {
-    const cleanSlug = slug
-      .trim()
-      .replace(/^\/+/, "")
-      .replace(/^services\//, "")
-      .replace(/\/+$/, "")
-
-    if (!cleanSlug) return
-
-    navigate(`/seo/${encodeURIComponent(`service:${cleanSlug}`)}`)
+  function openSeo(key: string) {
+    navigate(`/seo/${encodeURIComponent(key)}`)
   }
-
-  const serviceSettings = settings.filter((setting) =>
-    setting.page_key?.startsWith("service:")
-  )
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
@@ -62,7 +55,7 @@ const SeoListPage = () => {
           variant="secondary"
           onClick={() => navigate("/seo/site")}
         >
-          🌐 Site & Brand Settings
+          🌐 Site Settings
         </Button>
       </div>
 
@@ -70,7 +63,7 @@ const SeoListPage = () => {
       <Container className="p-0 divide-y divide-ui-border-base">
         <div className="px-6 py-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-ui-fg-subtle">
-            Pages
+            Main Site Pages
           </p>
         </div>
         {PAGE_TYPES.map((page) => {
@@ -81,7 +74,7 @@ const SeoListPage = () => {
             <div
               key={page.key}
               className="flex items-center justify-between px-6 py-4 hover:bg-ui-bg-base-hover cursor-pointer transition-all"
-              onClick={() => navigate(`/seo/${page.key}`)}
+              onClick={() => openSeo(page.key)}
             >
               <div className="flex items-center gap-4">
                 <span className="text-[22px]">{page.icon}</span>
@@ -92,11 +85,6 @@ const SeoListPage = () => {
                   <p className="text-xs text-ui-fg-subtle mt-0.5">
                     Schema: {page.schema}
                   </p>
-                  {setting?.meta_title && (
-                    <p className="text-xs text-ui-fg-subtle mt-0.5 truncate max-w-[400px]">
-                      Title: {setting.meta_title}
-                    </p>
-                  )}
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -110,65 +98,36 @@ const SeoListPage = () => {
         })}
       </Container>
 
-      {/* Individual Services Section */}
+      {/* Services Section */}
       <Container className="p-0 divide-y divide-ui-border-base">
         <div className="px-6 py-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-ui-fg-subtle">
-            Individual Service Pages
+            Service Pages
           </p>
         </div>
-        <div className="px-6 py-4">
-          <div className="flex items-end gap-3">
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-ui-fg-base">
-                Add or edit a service page
-              </p>
-              <p className="text-xs text-ui-fg-subtle mt-0.5">
-                Enter the service slug from /services/[slug]
-              </p>
-              <input
-                value={serviceSlug}
-                onChange={(e) => setServiceSlug(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") openServiceSeo(serviceSlug)
-                }}
-                placeholder="performance-marketing"
-                className="mt-3 w-full rounded-md border border-ui-border-base bg-ui-bg-field px-3 py-2 text-sm"
-              />
-            </div>
-            <Button
-              size="small"
-              variant="secondary"
-              onClick={() => openServiceSeo(serviceSlug)}
-            >
-              Edit SEO
-            </Button>
-          </div>
-        </div>
-        {serviceSettings.map((setting) => {
-          const slug = setting.page_key.replace("service:", "")
-          const isConfigured = !!setting.meta_title
+        {metadata.services.length === 0 && !loading && (
+          <div className="px-6 py-4 text-sm text-ui-fg-subtle">No services found in database.</div>
+        )}
+        {metadata.services.map((service) => {
+          const pageKey = `service:${service.slug}`
+          const setting = getSettingForPage(pageKey)
+          const isConfigured = !!setting?.meta_title
 
           return (
             <div
-              key={setting.page_key}
+              key={pageKey}
               className="flex items-center justify-between px-6 py-4 hover:bg-ui-bg-base-hover cursor-pointer transition-all"
-              onClick={() => openServiceSeo(slug)}
+              onClick={() => openSeo(pageKey)}
             >
               <div className="flex items-center gap-4">
                 <span className="text-[22px]">⚡</span>
                 <div>
                   <p className="text-sm font-semibold text-ui-fg-base">
-                    /services/{slug}
+                    {service.title}
                   </p>
                   <p className="text-xs text-ui-fg-subtle mt-0.5">
-                    Schema: WebPage + Service
+                    /services/{service.slug}
                   </p>
-                  {setting.meta_title && (
-                    <p className="text-xs text-ui-fg-subtle mt-0.5 truncate max-w-[400px]">
-                      Title: {setting.meta_title}
-                    </p>
-                  )}
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -182,36 +141,47 @@ const SeoListPage = () => {
         })}
       </Container>
 
-      {/* Blog Posts Note */}
+      {/* Work Section */}
       <Container className="p-0 divide-y divide-ui-border-base">
         <div className="px-6 py-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-ui-fg-subtle">
-            Blog
+            Work Case Studies
           </p>
         </div>
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
-            <span className="text-[22px]">📄</span>
-            <div>
-              <p className="text-sm font-semibold text-ui-fg-base">
-                Individual Blog Posts
-              </p>
-              <p className="text-xs text-ui-fg-subtle mt-0.5">
-                Schema: Article + BlogPosting + FAQPage
-              </p>
-              <p className="text-xs text-ui-fg-subtle mt-0.5">
-                SEO fields are managed inside each blog post
-              </p>
+        {metadata.work.length === 0 && !loading && (
+          <div className="px-6 py-4 text-sm text-ui-fg-subtle">No case studies found in database.</div>
+        )}
+        {metadata.work.map((item) => {
+          const pageKey = `work:${item.slug}`
+          const setting = getSettingForPage(pageKey)
+          const isConfigured = !!setting?.meta_title
+
+          return (
+            <div
+              key={pageKey}
+              className="flex items-center justify-between px-6 py-4 hover:bg-ui-bg-base-hover cursor-pointer transition-all"
+              onClick={() => openSeo(pageKey)}
+            >
+              <div className="flex items-center gap-4">
+                <span className="text-[22px]">📂</span>
+                <div>
+                  <p className="text-sm font-semibold text-ui-fg-base">
+                    {item.title}
+                  </p>
+                  <p className="text-xs text-ui-fg-subtle mt-0.5">
+                    /work/{item.slug}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge color={isConfigured ? "green" : "grey"}>
+                  {isConfigured ? "Configured" : "Not set"}
+                </Badge>
+                <span className="text-ui-fg-subtle text-sm">→</span>
+              </div>
             </div>
-          </div>
-          <Button
-            size="small"
-            variant="secondary"
-            onClick={() => navigate("/blog")}
-          >
-            Go to Blog →
-          </Button>
-        </div>
+          )
+        })}
       </Container>
 
     </div>
