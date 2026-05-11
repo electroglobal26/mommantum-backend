@@ -17,8 +17,16 @@ export default function ImagePicker({ onSelect, onClose, activeField }: Props) {
   const [error, setError] = useState("")
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
+    loadImages()
+  }, [])
+
+  function loadImages() {
+    setLoading(true)
+    setError("")
+
     fetch("/admin/blog/images", { credentials: "include" })
       .then((r) => r.json())
       .then(({ images, message }) => {
@@ -33,7 +41,53 @@ export default function ImagePicker({ onSelect, onClose, activeField }: Props) {
         setError(err.message)
         setLoading(false)
       })
-  }, [])
+  }
+
+  function fileToBase64(file: File) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = String(reader.result || "")
+        resolve(result.includes(",") ? result.split(",")[1] : result)
+      }
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function handleUpload(file: File | null) {
+    if (!file) return
+
+    setUploading(true)
+    setError("")
+
+    try {
+      const data = await fileToBase64(file)
+      const res = await fetch("/admin/blog/images", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          type: file.type,
+          data,
+        }),
+      })
+      const uploaded = await res.json()
+
+      if (!res.ok) {
+        setError(uploaded.message || "Upload failed")
+        return
+      }
+
+      setImages((prev) => [uploaded, ...prev])
+      setSelected(uploaded.url)
+    } catch (err: any) {
+      setError(err.message || "Upload failed")
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const filtered = images.filter((img) =>
     img.name.toLowerCase().includes(search.toLowerCase())
@@ -80,17 +134,35 @@ export default function ImagePicker({ onSelect, onClose, activeField }: Props) {
 
         {/* Search */}
         <div className="px-6 py-3 border-b border-ui-border-base">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by filename..."
-            autoFocus
-            className="w-full rounded-[8px] border border-ui-border-base bg-ui-bg-field px-3 py-2 text-sm outline-none"
-            style={{ boxShadow: "none" }}
-            onFocus={(e) => (e.target.style.borderColor = "#99dcf8")}
-            onBlur={(e) => (e.target.style.borderColor = "")}
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by filename..."
+              autoFocus
+              className="w-full rounded-[8px] border border-ui-border-base bg-ui-bg-field px-3 py-2 text-sm outline-none"
+              style={{ boxShadow: "none" }}
+              onFocus={(e) => (e.target.style.borderColor = "#99dcf8")}
+              onBlur={(e) => (e.target.style.borderColor = "")}
+            />
+            <label
+              className="flex shrink-0 cursor-pointer items-center rounded-[8px] px-4 py-2 text-[13px] font-semibold text-white transition-all"
+              style={{
+                background: uploading ? "#f3a3c7" : "#e61e73",
+                cursor: uploading ? "not-allowed" : "pointer",
+              }}
+            >
+              <input
+                type="file"
+                accept="image/*"
+                disabled={uploading}
+                onChange={(e) => handleUpload(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+              {uploading ? "Uploading..." : "Upload Image"}
+            </label>
+          </div>
         </div>
 
         {/* Grid */}
@@ -179,6 +251,13 @@ export default function ImagePicker({ onSelect, onClose, activeField }: Props) {
             )}
           </p>
           <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={loadImages}
+              className="rounded-[8px] border border-ui-border-base bg-white px-4 py-2 text-[13px] font-semibold text-ui-fg-base hover:bg-ui-bg-base-hover transition-all"
+            >
+              Refresh
+            </button>
             <button
               type="button"
               onClick={onClose}
