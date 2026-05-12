@@ -91,9 +91,26 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
 
   // Auto switch to HTML mode if complex HTML arrives
   useEffect(() => {
-    if (value && isComplexHtml(value) && mode === "visual") {
+    let initialValue = value || ""
+    // Remove Featured Image placeholder globally as requested
+    if (initialValue) {
+      let stripped = initialValue.replace(/<p[^>]*>\s*<em[^>]*>\s*\[Featured Image[^\]]*\]\s*<\/em>\s*<\/p>/gi, "")
+      
+      // Strip the n8n generated author/date meta paragraph
+      const metaRegex = /<p[^>]*>(?:(?!<\/p>)[\s\S])*?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}(?:(?!<\/p>)[\s\S])*?min read(?:(?!<\/p>)[\s\S])*?<\/p>/gi;
+      stripped = stripped.replace(metaRegex, "");
+
+      if (stripped !== initialValue) {
+        initialValue = stripped
+        setTimeout(() => onChange(stripped), 0)
+      }
+    }
+
+    if (initialValue && isComplexHtml(initialValue) && mode === "visual") {
       setMode("html")
-      setHtmlValue(value)
+      setHtmlValue(initialValue)
+    } else if (initialValue && !htmlValue) {
+      setHtmlValue(initialValue)
     }
   }, [value])
 
@@ -165,6 +182,115 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
             border-color: #be185d;
             transform: scale(1.01);
           }
+          
+          /* Frontend Preview Styles */
+          .blog-content { font-family: inherit; }
+          .blog-content h2 {
+            font-size: 26px; font-weight: 800; color: #0e2547;
+            letter-spacing: -0.04em; margin: 36px 0 14px; line-height: 1.1;
+            padding-bottom: 10px; border-bottom: 2px solid #f1f5f9;
+          }
+          .blog-content h2:first-child { margin-top: 0; }
+          .blog-content h3 { font-size: 20px; font-weight: 700; color: #0e2547; margin: 28px 0 10px; line-height: 1.2; }
+          .blog-content h4 { font-size: 17px; font-weight: 700; color: #1e3a5f; margin: 20px 0 8px; }
+          .blog-content p { font-size: 16px; line-height: 2; color: #475569; margin: 14px 0; }
+          .blog-content strong { font-weight: 700; color: #0e2547; }
+          .blog-content em { font-style: italic; }
+          .blog-content u { text-decoration: underline; }
+          .blog-content s { text-decoration: line-through; color: #94a3b8; }
+          .blog-content ul { list-style: none; padding: 0; margin: 20px 0; }
+          .blog-content ul li {
+            display: flex; align-items: flex-start; gap: 12px;
+            font-size: 16px; line-height: 1.85; color: #475569;
+            margin: 10px 0; padding: 10px 14px;
+            background: #f8fafc; border-radius: 10px; border-left: 3px solid #e61e73;
+          }
+          .blog-content ul li::before {
+            content: ""; display: inline-block; width: 7px; height: 7px;
+            border-radius: 50%; background: #e61e73; flex-shrink: 0; margin-top: 9px;
+          }
+          .blog-content ol { padding-left: 0; margin: 20px 0; counter-reset: ol-counter; list-style: none; }
+          .blog-content ol li {
+            counter-increment: ol-counter; display: flex; align-items: flex-start;
+            gap: 14px; font-size: 16px; line-height: 1.85; color: #475569;
+            margin: 10px 0; padding: 10px 14px; background: #f8fafc; border-radius: 10px;
+          }
+          .blog-content ol li::before {
+            content: counter(ol-counter); display: flex; align-items: center;
+            justify-content: center; min-width: 26px; height: 26px;
+            border-radius: 50%; background: #0e2547; color: white;
+            font-size: 12px; font-weight: 800; flex-shrink: 0; margin-top: 2px;
+          }
+          .blog-content h2:first-of-type {
+            border-bottom: 0; margin-bottom: 16px; padding-bottom: 0;
+            text-align: center;
+          }
+          .blog-content h2:first-of-type + ol {
+            counter-reset: toc-section; display: flex; flex-direction: column; gap: 14px;
+            margin: 18px 0 36px; padding: 20px;
+            border: 1px solid #e2e8f0; border-radius: 18px;
+            background: #f8fafc; list-style: none;
+          }
+          .blog-content h2:first-of-type + ol li {
+            background: white; border: 1px solid #edf2f7; border-left: 0;
+            box-shadow: 0 8px 22px rgba(14,37,71,0.04);
+          }
+          .blog-content h2:first-of-type + ol > li {
+            counter-increment: toc-section; display: block;
+            position: relative; margin: 0; padding: 16px 16px 16px 58px;
+            border-radius: 14px;
+          }
+          .blog-content h2:first-of-type + ol > li::before {
+            content: counter(toc-section); width: 30px; min-width: 30px; height: 30px;
+            display: inline-flex; align-items: center; justify-content: center;
+            position: absolute; left: 16px; top: 16px;
+            border-radius: 999px; background: #0e2547; color: white;
+            font-size: 13px; font-weight: 800; margin-top: 0;
+          }
+          .blog-content h2:first-of-type + ol > li > a,
+          .blog-content h2:first-of-type + ol > li > p,
+          .blog-content h2:first-of-type + ol > li > span {
+            display: block;
+            color: #0e2547; font-weight: 800;
+            line-height: 1.55; border-bottom: 0;
+            margin-bottom: 8px;
+          }
+          .blog-content h2:first-of-type + ol > li > a:last-child,
+          .blog-content h2:first-of-type + ol > li > p:last-child,
+          .blog-content h2:first-of-type + ol > li > span:last-child {
+            margin-bottom: 0;
+          }
+          .blog-content h2:first-of-type + ol ol {
+            display: flex; flex-direction: column; gap: 10px;
+            margin: 14px 0 0; padding: 0; list-style: none;
+          }
+          .blog-content h2:first-of-type + ol ol li {
+            display: flex; align-items: flex-start; gap: 12px;
+            margin: 0; padding: 12px 14px;
+            border-radius: 12px;
+          }
+          .blog-content h2:first-of-type + ol ol li::before {
+            content: none;
+          }
+          .blog-content h2:first-of-type + ol ol a,
+          .blog-content h2:first-of-type + ol ol p,
+          .blog-content h2:first-of-type + ol ol span {
+            color: #334155; border-bottom: 0; font-weight: 700; line-height: 1.6;
+            margin: 0;
+          }
+          .blog-content h2:first-of-type + ol ol span:first-child,
+          .blog-content h2:first-of-type + ol ol strong:first-child {
+            flex: 0 0 44px; color: #64748b; font-size: 13px;
+          }
+          .blog-content blockquote {
+            border-left: 4px solid #e61e73; padding: 16px 22px; margin: 24px 0;
+            background: linear-gradient(135deg, #fff5f8 0%, #fff0f5 100%);
+            border-radius: 0 12px 12px 0; color: #475569;
+            font-size: 17px; line-height: 1.85; font-style: italic;
+            box-shadow: 0 4px 14px rgba(230,30,115,0.08);
+          }
+          .blog-content a { color: #e61e73; text-decoration: none; font-weight: 600; border-bottom: 1px solid rgba(230,30,115,0.3); transition: border-color 0.2s; }
+          .blog-content a:hover { border-bottom-color: #e61e73; }
         `
         document.head.appendChild(style)
       }
@@ -235,11 +361,23 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
   }, [])
 
   useEffect(() => {
-    if (!quillRef.current || !value) return
+    if (!quillRef.current || value === undefined) return
     if (isComplexHtml(value)) return
-    if (quillRef.current.root.innerHTML !== value) {
-      quillRef.current.root.innerHTML = value
-      setHtmlValue(value)
+    
+    // Check if value still contains Featured Image or Meta string, and strip it
+    let safeValue = value
+    const metaRegex = /<p[^>]*>(?:(?!<\/p>)[\s\S])*?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}(?:(?!<\/p>)[\s\S])*?min read(?:(?!<\/p>)[\s\S])*?<\/p>/gi;
+    let stripped = safeValue.replace(/<p[^>]*>\s*<em[^>]*>\s*\[Featured Image[^\]]*\]\s*<\/em>\s*<\/p>/gi, "")
+    stripped = stripped.replace(metaRegex, "");
+
+    if (stripped !== safeValue) {
+      safeValue = stripped
+      onChange(stripped)
+    }
+
+    if (quillRef.current.root.innerHTML !== safeValue) {
+      quillRef.current.root.innerHTML = safeValue
+      setHtmlValue(safeValue)
     }
   }, [value])
 
@@ -304,6 +442,19 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
     if (mode === "preview" || mode === "html") {
       replacePlaceholderWithImage(url, imagePlaceholderIndex, "blog image")
       setImagePickerOpen(false)
+      setTimeout(() => {
+        const previewContainer = document.querySelector('.blog-preview-container')
+        if (previewContainer) {
+          const imgs = previewContainer.querySelectorAll('img')
+          const newImg = Array.from(imgs).find(i => i.getAttribute('src') === url)
+          if (newImg) {
+            setEditingImage(newImg as HTMLImageElement)
+            setTempAlt("blog image")
+            setTempWidth(newImg.getAttribute("width") || "")
+            setImageModalOpen(true)
+          }
+        }
+      }, 100)
       return
     }
     if (!quillRef.current) return
@@ -331,41 +482,88 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
   }
 
   function saveImageOptions() {
-    if (!editingImage || !quillRef.current) return
-    editingImage.setAttribute("alt", tempAlt)
-    if (tempWidth) {
-      editingImage.setAttribute("width", tempWidth)
-      editingImage.style.width = tempWidth
+    if (!editingImage) return
+    
+    if (mode === "visual" && quillRef.current) {
+      editingImage.setAttribute("alt", tempAlt)
+      if (tempWidth) {
+        editingImage.setAttribute("width", tempWidth)
+        editingImage.style.width = tempWidth
+      } else {
+        editingImage.removeAttribute("width")
+        editingImage.style.width = ""
+      }
+      const html = quillRef.current.root.innerHTML
+      onChange(html)
+      setHtmlValue(html)
     } else {
-      editingImage.removeAttribute("width")
-      editingImage.style.width = ""
+      // In preview or html mode, modify the htmlValue directly
+      const src = editingImage.getAttribute("src")
+      const tempDiv = document.createElement("div")
+      tempDiv.innerHTML = htmlValue
+      const img = Array.from(tempDiv.querySelectorAll("img")).find(i => i.getAttribute("src") === src)
+      if (img) {
+        img.setAttribute("alt", tempAlt)
+        if (tempWidth) {
+          img.setAttribute("width", tempWidth)
+          img.style.width = tempWidth
+        } else {
+          img.removeAttribute("width")
+          img.style.width = ""
+        }
+        const clean = tempDiv.innerHTML
+        setHtmlValue(clean)
+        onChange(clean)
+        if (quillRef.current) quillRef.current.root.innerHTML = clean
+      }
+      
+      // Also update the DOM node visually if it's in preview
+      editingImage.setAttribute("alt", tempAlt)
+      if (tempWidth) {
+        editingImage.setAttribute("width", tempWidth)
+        editingImage.style.width = tempWidth
+      } else {
+        editingImage.removeAttribute("width")
+        editingImage.style.width = ""
+      }
     }
 
-    const html = quillRef.current.root.innerHTML
-    onChange(html)
-    setHtmlValue(html)
     setImageModalOpen(false)
     setEditingImage(null)
   }
 
   function deleteImage(nodeToHuber?: HTMLElement) {
     const targetNode = nodeToHuber || editingImage
-    if (!targetNode || !quillRef.current) return
+    if (!targetNode) return
     
     if (window.confirm("Are you sure you want to remove this image?")) {
-      // Find the blot and remove it through Quill for better consistency
-      if (mode === "visual") {
+      const src = targetNode.getAttribute("src")
+      
+      if (mode === "visual" && quillRef.current) {
         const blot = (window as any).Quill?.find(targetNode)
         if (blot) blot.remove()
         else targetNode.remove()
+        
+        const html = quillRef.current.root.innerHTML
+        const clean = html === "<p><br></p>" ? "" : html
+        onChange(clean)
+        setHtmlValue(clean)
       } else {
+        // Preview or HTML mode
+        const tempDiv = document.createElement("div")
+        tempDiv.innerHTML = htmlValue
+        const img = Array.from(tempDiv.querySelectorAll("img")).find(i => i.getAttribute("src") === src)
+        if (img) img.remove()
+        
+        const clean = tempDiv.innerHTML === "<p><br></p>" ? "" : tempDiv.innerHTML
+        setHtmlValue(clean)
+        onChange(clean)
+        if (quillRef.current) quillRef.current.root.innerHTML = clean
+        
+        // Remove from preview DOM directly to reflect immediately
         targetNode.remove()
       }
       
-      const html = quillRef.current.root.innerHTML
-      const clean = html === "<p><br></p>" ? "" : html
-      onChange(clean)
-      setHtmlValue(clean)
       setImageModalOpen(false)
       setEditingImage(null)
       setHoveredImage(null)
@@ -392,8 +590,10 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
 
   function switchMode(newMode: EditorMode) {
     if (newMode === "visual" && quillRef.current) {
-      // Use clipboard for safer HTML pasting in Quill 2
-      quillRef.current.clipboard.dangerouslyPasteHTML(htmlValue || "")
+      // Use innerHTML instead of dangerouslyPasteHTML to prevent layout shifts/formatting changes
+      if (quillRef.current.root.innerHTML !== htmlValue) {
+        quillRef.current.root.innerHTML = htmlValue || ""
+      }
       onChange(htmlValue)
     }
     if (newMode === "html" && mode === "visual" && quillRef.current) {
@@ -497,7 +697,7 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
       {/* PREVIEW MODE */}
       {mode === "preview" && (
         <div
-          className="overflow-y-auto"
+          className="overflow-y-auto blog-preview-container"
           style={{ minHeight: "400px", maxHeight: "700px", background: "#fff" }}
         >
           <div
@@ -515,8 +715,17 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
             </span>
           </div>
           <div
-            className="p-6"
+            className="p-6 blog-content"
             onScroll={() => setHoveredImage(null)}
+            onClick={(e) => {
+              const target = e.target as HTMLElement
+              if (target.tagName === "IMG") {
+                setEditingImage(target as HTMLImageElement)
+                setTempAlt(target.getAttribute("alt") || "")
+                setTempWidth(target.getAttribute("width") || "")
+                setImageModalOpen(true)
+              }
+            }}
             onMouseMove={(e) => {
               const target = e.target as HTMLElement
               const isImg = target.tagName === "IMG"

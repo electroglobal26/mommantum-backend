@@ -16,6 +16,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       return res.status(400).json({ message: "Title is required" })
     }
 
+    // Resolve category_id — never pass null if column is NOT NULL
+    const category_id: string = body.category_id || process.env.DEFAULT_CATEGORY_ID || "general"
+
     const slug: string = body.slug || body.title
       .toLowerCase()
       .replace(/\s+/g, "-")
@@ -32,8 +35,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         excerpt:          body.excerpt        || null,
         content:          body.content        || null,
         published_at:     body.status === "published" ? new Date() : null,
-        meta_title:       body.meta_title        || null,
-        meta_description: body.meta_description  || null,
+        meta_title:       body.meta_title       || null,
+        meta_description: body.meta_description || null,
+        category_id,                               // ← never null
         faqs:             body.faqs           || [],
       },
     })
