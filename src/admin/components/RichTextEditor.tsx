@@ -83,6 +83,7 @@ const RichTextEditor = ({ value, onChange, placeholder }: Props) => {
   const [altModalOpen, setAltModalOpen] = useState(false)
   const [altSrc, setAltSrc] = useState("")
   const [tempAlt, setTempAlt] = useState("")
+  const [replaceMode, setReplaceMode] = useState(false) // true = replacing existing image
 
   // ── Initialise once from value prop ────────────────────────────────────────
   useEffect(() => {
@@ -117,6 +118,24 @@ const RichTextEditor = ({ value, onChange, placeholder }: Props) => {
     const imgTag = `<img src="${url}" alt="" style="max-width:100%;border-radius:10px;margin:16px 0;display:block;" />`
 
     let updated = htmlValue
+
+    if (replaceMode && altSrc) {
+      // Replace existing image src in-place, keep alt text
+      const escaped = altSrc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      updated = htmlValue.replace(
+        new RegExp(`<img([^>]*)src="${escaped}"([^>]*)>`, "gi"),
+        (match, before, after) => {
+          // Preserve existing alt, just swap src
+          return `<img${before}src="${url}"${after}>`
+        }
+      )
+      setReplaceMode(false)
+      commit(updated)
+      // Re-open alt modal for the replaced image with existing alt
+      setAltSrc(url)
+      setAltModalOpen(true)
+      return
+    }
 
     if (insertIndex !== null) {
       // Replace the nth placeholder
@@ -163,18 +182,22 @@ const RichTextEditor = ({ value, onChange, placeholder }: Props) => {
     commit(updated)
     setAltModalOpen(false)
     setAltSrc("")
+    setTempAlt("")
+    setReplaceMode(false)
   }
 
-  // ── Image delete ────────────────────────────────────────────────────────────
+  // ── Image delete — replaces with placeholder instead of removing ────────────
   function deleteImageBySrc(src: string) {
     const escaped = src.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const placeholder = `<p><em>[Image Placeholder]</em></p>`
     const updated = htmlValue.replace(
       new RegExp(`<img[^>]*src="${escaped}"[^>]*\\/?>`, "gi"),
-      ""
+      placeholder
     )
     commit(updated)
     setAltModalOpen(false)
     setAltSrc("")
+    setTempAlt("")
   }
 
   // ── Preview click handler ───────────────────────────────────────────────────
@@ -184,6 +207,7 @@ const RichTextEditor = ({ value, onChange, placeholder }: Props) => {
       const src = (target as HTMLImageElement).getAttribute("src") || ""
       setAltSrc(src)
       setTempAlt((target as HTMLImageElement).getAttribute("alt") || "")
+      setReplaceMode(false)
       setAltModalOpen(true)
     }
   }
@@ -314,19 +338,32 @@ const RichTextEditor = ({ value, onChange, placeholder }: Props) => {
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm("Remove this image from the content?")) {
+                  if (window.confirm("Remove this image? It will be replaced with a placeholder you can fill in later.")) {
                     deleteImageBySrc(altSrc)
                   }
                 }}
                 className="rounded-lg border border-red-200 px-4 py-2 text-[13px] font-semibold text-red-500 hover:bg-red-50 transition-colors"
               >
-                🗑 Remove Image
+                🗑 Remove
               </button>
 
               <div className="flex items-center gap-2">
+                {/* Replace button */}
                 <button
                   type="button"
-                  onClick={() => { setAltModalOpen(false); setAltSrc("") }}
+                  onClick={() => {
+                    setReplaceMode(true)
+                    setAltModalOpen(false)
+                    setInsertIndex(null)
+                    setImagePickerOpen(true)
+                  }}
+                  className="rounded-lg border border-[#e61e73] px-4 py-2 text-[13px] font-semibold text-[#e61e73] hover:bg-pink-50 transition-colors"
+                >
+                  🔄 Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAltModalOpen(false); setAltSrc(""); setReplaceMode(false) }}
                   className="rounded-lg px-4 py-2 text-[13px] font-semibold text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   Cancel
