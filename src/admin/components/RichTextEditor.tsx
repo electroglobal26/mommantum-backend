@@ -28,6 +28,7 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const quillRef = useRef<any>(null)
   const isInitialized = useRef(false)
+  const isProgrammaticChange = useRef(false) // Flag to prevent text-change loop
   const isComplex = isComplexHtml(value || "")
 
   const [mode, setMode] = useState<EditorMode>(
@@ -38,11 +39,10 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
   const [imagePlaceholderIndex, setImagePlaceholderIndex] = useState<number | null>(null)
   const quillRangeRef = useRef<any>(null)
 
-  // Custom Image Options Modal State
+  // Custom Image Options Modal State — alt text only
   const [imageModalOpen, setImageModalOpen] = useState(false)
   const [editingImage, setEditingImage] = useState<HTMLImageElement | null>(null)
   const [tempAlt, setTempAlt] = useState("")
-  const [tempWidth, setTempWidth] = useState("")
 
   // Hover delete state
   const [hoveredImage, setHoveredImage] = useState<{ node: HTMLElement; rect: DOMRect } | null>(null)
@@ -53,7 +53,6 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
     if (target.tagName === "IMG" && quillRef.current) {
       setEditingImage(target)
       setTempAlt(target.getAttribute("alt") || "")
-      setTempWidth(target.getAttribute("width") || "")
       setImageModalOpen(true)
     }
   }, [])
@@ -297,33 +296,6 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
 
       const Quill = (await import("quill")).default
 
-      // Extend Image blot to support alt and width
-      const ImageBlot = Quill.import("formats/image") as any
-      class CustomImage extends ImageBlot {
-        static create(value: any) {
-          const node = super.create(value)
-          if (typeof value === "string") {
-            node.setAttribute("src", value)
-          } else if (typeof value === "object") {
-            node.setAttribute("src", value.url)
-            if (value.alt) node.setAttribute("alt", value.alt)
-            if (value.width) node.setAttribute("width", value.width)
-            if (value.style) node.setAttribute("style", value.style)
-          }
-          return node
-        }
-
-        static value(node: HTMLElement) {
-          return {
-            url: node.getAttribute("src"),
-            alt: node.getAttribute("alt"),
-            width: node.getAttribute("width"),
-            style: node.getAttribute("style"),
-          }
-        }
-      }
-      Quill.register(CustomImage, true)
-
       const quill = new Quill(containerRef.current!, {
         theme: "snow",
         placeholder: placeholder || "Write your blog content here...",
@@ -343,11 +315,14 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
 
 
       if (value && !isComplexHtml(value)) {
+        isProgrammaticChange.current = true
         quill.root.innerHTML = value
+        isProgrammaticChange.current = false
         setHtmlValue(value)
       }
 
       quill.on("text-change", () => {
+        if (isProgrammaticChange.current) return // ignore programmatic changes
         const html = quill.root.innerHTML
         const clean = html === "<p><br></p>" ? "" : html
         onChange(clean)
@@ -360,25 +335,38 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
     loadQuill()
   }, [])
 
+  // Track whether Quill has been initialised and loaded with content
+  const quillLoadedRef = useRef(false)
+
+  // Safe helper: set Quill innerHTML without triggering text-change → onChange loop
+  function setQuillHtml(html: string) {
+    if (!quillRef.current) return
+    isProgrammaticChange.current = true
+    quillRef.current.root.innerHTML = html
+    isProgrammaticChange.current = false
+  }
+
   useEffect(() => {
     if (!quillRef.current || value === undefined) return
     if (isComplexHtml(value)) return
-    
-    // Check if value still contains Featured Image or Meta string, and strip it
-    let safeValue = value
-    const metaRegex = /<p[^>]*>(?:(?!<\/p>)[\s\S])*?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}(?:(?!<\/p>)[\s\S])*?min read(?:(?!<\/p>)[\s\S])*?<\/p>/gi;
-    let stripped = safeValue.replace(/<p[^>]*>\s*<em[^>]*>\s*\[Featured Image[^\]]*\]\s*<\/em>\s*<\/p>/gi, "")
-    stripped = stripped.replace(metaRegex, "");
 
-    if (stripped !== safeValue) {
-      safeValue = stripped
-      onChange(stripped)
-    }
+    // Only strip placeholders/meta on first load — never overwrite Quill while user is editing
+    if (!quillLoadedRef.current) {
+      let safeValue = value
+      const metaRegex = /<p[^>]*>(?:(?!<\/p>)[\s\S])*?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}(?:(?!<\/p>)[\s\S])*?min read(?:(?!<\/p>)[\s\S])*?<\/p>/gi
+      let stripped = safeValue.replace(/<p[^>]*>\s*<em[^>]*>\s*\[Featured Image[^\]]*\]\s*<\/em>\s*<\/p>/gi, "")
+      stripped = stripped.replace(metaRegex, "")
 
-    if (quillRef.current.root.innerHTML !== safeValue) {
-      quillRef.current.root.innerHTML = safeValue
+      if (stripped !== safeValue) {
+        safeValue = stripped
+        onChange(stripped)
+      }
+
+      setQuillHtml(safeValue)
       setHtmlValue(safeValue)
+      quillLoadedRef.current = true
     }
+    // After first load: do NOT overwrite Quill — htmlValue is the source of truth
   }, [value])
 
   // Replace image placeholder with actual image URL
@@ -450,7 +438,6 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
           if (newImg) {
             setEditingImage(newImg as HTMLImageElement)
             setTempAlt("blog image")
-            setTempWidth(newImg.getAttribute("width") || "")
             setImageModalOpen(true)
           }
         }
@@ -462,69 +449,57 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
       ? quillRangeRef.current.index
       : quillRef.current.getLength()
     
-    // Using object for value because CustomImage blot handles it
-    quillRef.current.insertEmbed(index, "image", { url, alt: "blog image" })
+    // Insert as plain URL (Quill default) — no object, no custom blot
+    quillRef.current.insertEmbed(index, "image", url)
     quillRef.current.setSelection(index + 1)
     
-    // Immediately select the newly inserted image to open modal
+    // Immediately find the newly inserted image and set alt attribute directly on DOM
     setTimeout(() => {
       const imgs = quillRef.current.root.querySelectorAll("img")
-      const newImg = imgs[imgs.length - 1] // Roughly the last one
+      const newImg = Array.from(imgs).find(i => i.getAttribute("src") === url)
       if (newImg) {
+        newImg.setAttribute("alt", "blog image")
         setEditingImage(newImg)
-        setTempAlt("")
-        setTempWidth(newImg.getAttribute("width") || "")
+        setTempAlt("blog image")
         setImageModalOpen(true)
       }
-    }, 100)
+    }, 50)
 
     setImagePickerOpen(false)
   }
 
   function saveImageOptions() {
     if (!editingImage) return
-    
+
+    // Set alt directly on the DOM node — safe, doesn't touch Quill's delta
+    editingImage.setAttribute("alt", tempAlt)
+
     if (mode === "visual" && quillRef.current) {
-      editingImage.setAttribute("alt", tempAlt)
-      if (tempWidth) {
-        editingImage.setAttribute("width", tempWidth)
-        editingImage.style.width = tempWidth
-      } else {
-        editingImage.removeAttribute("width")
-        editingImage.style.width = ""
-      }
+      // Read innerHTML AFTER the DOM mutation above
       const html = quillRef.current.root.innerHTML
       onChange(html)
       setHtmlValue(html)
     } else {
-      // In preview or html mode, modify the htmlValue directly
+      // Preview or HTML mode — update the stored HTML string
       const src = editingImage.getAttribute("src")
-      const tempDiv = document.createElement("div")
-      tempDiv.innerHTML = htmlValue
-      const img = Array.from(tempDiv.querySelectorAll("img")).find(i => i.getAttribute("src") === src)
-      if (img) {
-        img.setAttribute("alt", tempAlt)
-        if (tempWidth) {
-          img.setAttribute("width", tempWidth)
-          img.style.width = tempWidth
-        } else {
-          img.removeAttribute("width")
-          img.style.width = ""
+      if (src) {
+        const escapedSrc = src.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        // Replace existing alt or inject new one
+        let updated = htmlValue.replace(
+          new RegExp(`(<img[^>]*src="${escapedSrc}"[^>]*?)\\s*alt="[^"]*"`, "i"),
+          `$1 alt="${tempAlt}"`
+        )
+        if (!updated.includes(`alt="${tempAlt}"`)) {
+          updated = htmlValue.replace(
+            new RegExp(`(<img[^>]*src="${escapedSrc}")`),
+            `$1 alt="${tempAlt}"`
+          )
         }
-        const clean = tempDiv.innerHTML
-        setHtmlValue(clean)
-        onChange(clean)
-        if (quillRef.current) quillRef.current.root.innerHTML = clean
-      }
-      
-      // Also update the DOM node visually if it's in preview
-      editingImage.setAttribute("alt", tempAlt)
-      if (tempWidth) {
-        editingImage.setAttribute("width", tempWidth)
-        editingImage.style.width = tempWidth
-      } else {
-        editingImage.removeAttribute("width")
-        editingImage.style.width = ""
+        setHtmlValue(updated)
+        onChange(updated)
+        if (quillRef.current && !isComplexHtml(updated)) {
+          setQuillHtml(updated)
+        }
       }
     }
 
@@ -558,7 +533,7 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
         const clean = tempDiv.innerHTML === "<p><br></p>" ? "" : tempDiv.innerHTML
         setHtmlValue(clean)
         onChange(clean)
-        if (quillRef.current) quillRef.current.root.innerHTML = clean
+        if (quillRef.current) setQuillHtml(clean)
         
         // Remove from preview DOM directly to reflect immediately
         targetNode.remove()
@@ -590,15 +565,15 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
 
   function switchMode(newMode: EditorMode) {
     if (newMode === "visual" && quillRef.current) {
-      // Use innerHTML instead of dangerouslyPasteHTML to prevent layout shifts/formatting changes
-      if (quillRef.current.root.innerHTML !== htmlValue) {
-        quillRef.current.root.innerHTML = htmlValue || ""
-      }
-      onChange(htmlValue)
+      // Always load the latest htmlValue into Quill when switching to visual
+      setQuillHtml(htmlValue || "")
     }
     if (newMode === "html" && mode === "visual" && quillRef.current) {
+      // Capture latest Quill content into htmlValue before leaving visual mode
       const current = quillRef.current.root.innerHTML
-      setHtmlValue(current === "<p><br></p>" ? "" : current)
+      const clean = current === "<p><br></p>" ? "" : current
+      setHtmlValue(clean)
+      onChange(clean)
     }
     setMode(newMode)
   }
@@ -722,7 +697,6 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
               if (target.tagName === "IMG") {
                 setEditingImage(target as HTMLImageElement)
                 setTempAlt(target.getAttribute("alt") || "")
-                setTempWidth(target.getAttribute("width") || "")
                 setImageModalOpen(true)
               }
             }}
@@ -771,7 +745,7 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
           <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="border-b border-gray-100 bg-gray-50/50 px-6 py-4">
               <h3 className="text-lg font-bold text-[#0e2547]">🖼 Image Options</h3>
-              <p className="text-xs text-gray-500">Update SEO alt text and display settings</p>
+              <p className="text-xs text-gray-500">Add alt text for SEO</p>
             </div>
             
             <div className="p-6 space-y-5">
@@ -786,44 +760,20 @@ const RichTextEditor = ({ value, onChange, placeholder, forceHtml }: Props) => {
                 </div>
               )}
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
-                    Alt Text (SEO Description)
-                  </label>
-                  <input
-                    type="text"
-                    value={tempAlt}
-                    onChange={(e) => setTempAlt(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none transition-all focus:border-[#e61e73] focus:ring-2 focus:ring-[#e61e73]/10"
-                    placeholder="Describe this image for search engines..."
-                    autoFocus
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
-                    Display Width
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={tempWidth}
-                      onChange={(e) => setTempWidth(e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none transition-all focus:border-[#e61e73] focus:ring-2 focus:ring-[#e61e73]/10"
-                      placeholder="e.g. 100%, 400px"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setTempWidth("100%")}
-                      className="rounded-lg border border-gray-200 px-3 text-xs font-semibold hover:bg-gray-50 active:bg-gray-100"
-                    >
-                      Full
-                    </button>
-                  </div>
-                </div>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                  Alt Text (SEO Description)
+                </label>
+                <input
+                  type="text"
+                  value={tempAlt}
+                  onChange={(e) => setTempAlt(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveImageOptions() } }}
+                  className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none transition-all focus:border-[#e61e73] focus:ring-2 focus:ring-[#e61e73]/10"
+                  placeholder="Describe this image for search engines..."
+                  autoFocus
+                />
               </div>
-
             </div>
 
             <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/50 px-6 py-4">
